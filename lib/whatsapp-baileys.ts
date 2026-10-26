@@ -419,7 +419,7 @@ const DISCONNECT_REASON_TEXT: Record<number, string> = {
 function wipeBaileysAuth() {
   for (const dir of [getBaileysAuthFolder(), path.join(process.cwd(), '.baileys_auth')]) {
     try {
-      if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true });
     } catch (err) {
       console.error('[Baileys] No se pudo borrar la carpeta de sesión', dir, err);
     }

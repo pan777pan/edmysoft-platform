@@ -346,7 +346,7 @@ export default function AdminUsersPage() {
                         <div>
                           <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                             {u.name}
-                            {isEdierOwner && <ShieldCheck className="w-4 h-4 text-cyan-400" title="Director Técnico & Creador" />}
+                            {isEdierOwner && <span title="Director Técnico & Creador"><ShieldCheck className="w-4 h-4 text-cyan-400" /></span>}
                           </h3>
                           <p className="text-[11px] text-slate-400 flex items-center gap-1">
                             <Briefcase className="w-3 h-3 text-slate-500" />

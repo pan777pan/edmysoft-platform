@@ -420,11 +420,7 @@ export default function WhatsAppConnectionPage() {
       await fetch('/api/admin/whatsapp-demo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          active: demo.active,
-          expiresAt: demo.expiresAt,
-          ...updatedDemo,
-        }),
+        body: JSON.stringify(updatedDemo),
       });
       showToast(`Plantilla "${preset.name}" guardada y lista.`);
     } catch {

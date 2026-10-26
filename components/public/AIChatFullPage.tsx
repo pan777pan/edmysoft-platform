@@ -93,6 +93,9 @@ export default function AIChatFullPage() {
       }
     } catch {}
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
     try {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
