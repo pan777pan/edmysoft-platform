@@ -1,0 +1,448 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// USUARIOS Y ROLES (SUPERADMIN, COMERCIAL, SOPORTE)
+// ----------------------------------------------------
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  passwordHash  String
+  role          String    @default("COMERCIAL") // SUPERADMIN, ADMIN, TRABAJADOR_VENTAS, TRABAJADOR_SOPORTE, TECNICO
+  permissions   String?   // JSON serializado de permisos granulares
+  phone         String?
+  jobTitle      String?   // Cargo / Perfil
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  assignedLeads Opportunity[]
+  activityLogs  ActivityLog[]
+  quoteApprovals Quote[]       @relation("QuoteApprover")
+}
+
+// ----------------------------------------------------
+// CATÁLOGO COMERCIAL: SERVICIOS, PLANES Y MÓDULOS
+// ----------------------------------------------------
+model Service {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  name            String
+  category        String        // IA, Web, Automatización, CRM, etc.
+  shortDesc       String
+  longDesc        String?
+  icon            String?       // Nombre de icono lucide
+  badgeText       String?       // Ej: "Más solicitado"
+  order           Int           @default(0)
+  status          String        @default("ACTIVE") // ACTIVE, INACTIVE, DRAFT
+  features        String        // JSON serializado
+  targetAudience  String?
+  problemsSolved  String?       // JSON serializado
+  useCases        String?       // JSON serializado
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  plans           Plan[]
+  modules         ServiceModule[]
+  quoteItems      QuoteItem[]
+}
+
+model Plan {
+  id              String        @id @default(cuid())
+  serviceId       String
+  service         Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  slug            String
+  name            String        // Ej: Básico, Plus, Enterprise
+  description     String?
+  setupPrice      Float         @default(0.0)
+  recurringPrice  Float         @default(0.0)
+  billingPeriod   String        @default("MONTHLY") // ONE_TIME, MONTHLY, ANNUAL
+  isRecommended   Boolean       @default(false)
+  featuresIncluded String       // JSON serializado
+  usageLimits     String?       // JSON serializado
+  order           Int           @default(0)
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  moduleOverrides PlanModuleOverride[]
+  quoteItems      QuoteItem[]
+
+  @@unique([serviceId, slug])
+}
+
+model ServiceModule {
+  id              String         @id @default(cuid())
+  serviceId       String?
+  service         Service?       @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  name            String
+  code            String         @unique // Identificador técnico
+  description     String
+  setupPrice      Float          @default(0.0)
+  recurringPrice  Float          @default(0.0)
+  billingPeriod   String         @default("MONTHLY")
+  defaultRule     String         @default("OPTIONAL") // INCLUDED, OPTIONAL, REQUIRED, INCOMPATIBLE
+  isTechnicalReady Boolean       @default(false)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  overrides       PlanModuleOverride[]
+  quoteItems      QuoteItem[]
+}
+
+model PlanModuleOverride {
+  id              String         @id @default(cuid())
+  planId          String
+  plan            Plan           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  moduleId        String
+  module          ServiceModule  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  rule            String         // INCLUDED, OPTIONAL, REQUIRED, INCOMPATIBLE
+  customSetupPrice Float?
+  customRecPrice  Float?
+
+  @@unique([planId, moduleId])
+}
+
+// ----------------------------------------------------
+// CRM: CONTACTOS, OPORTUNIDADES Y CONVERSACIONES
+// ----------------------------------------------------
+model Contact {
+  id              String        @id @default(cuid())
+  fullName        String
+  phone           String?       @unique
+  email           String?
+  companyName     String?
+  preferredChannel String       @default("WHATSAPP") // WHATSAPP, WEB_FORM, INSTAGRAM, etc.
+  city            String?       @default("Colombia")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  opportunities   Opportunity[]
+  conversations   Conversation[]
+  quotes          Quote[]
+}
+
+model Opportunity {
+  id              String            @id @default(cuid())
+  contactId       String
+  contact         Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  title           String
+  stage           String            @default("NUEVO") // NUEVO, EN_DIAGNOSTICO, CALIFICADO, COTIZACION_EN_PREPARACION, PENDIENTE_APROBACION, ENVIADA, GANADA, PERDIDA
+  serviceInterest String?
+  identifiedNeed  String?
+  targetBudget    Float?
+  desiredDeadline String?
+  estimatedValue  Float?
+  assignedToId    String?
+  assignedTo      User?             @relation(fields: [assignedToId], references: [id])
+  lossReason      String?
+  nextActionDate  DateTime?
+  nextActionNote  String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  stageHistory    StageHistory[]
+  quotes          Quote[]
+  tasks           TaskReminder[]
+}
+
+model StageHistory {
+  id              String            @id @default(cuid())
+  opportunityId   String
+  opportunity     Opportunity       @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  fromStage       String?
+  toStage         String
+  notes           String?
+  changedById     String?
+  createdAt       DateTime          @default(now())
+}
+
+// ----------------------------------------------------
+// CONVERSACIONES Y CONTROL ASISTENTE / HUMANO
+// ----------------------------------------------------
+model Conversation {
+  id              String              @id @default(cuid())
+  contactId       String
+  contact         Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  channel         String              @default("WHATSAPP")
+  status          String              @default("AI_HANDLING") // AI_HANDLING, HUMAN_CONTROL, CLOSED
+  externalThreadId String?
+  takenByUserId   String?
+  lastMessageAt   DateTime            @default(now())
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  messages        Message[]
+  aiLogs          AILog[]
+}
+
+model Message {
+  id              String        @id @default(cuid())
+  conversationId  String
+  conversation    Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderType      String        // CLIENT, AI, HUMAN, SYSTEM
+  senderName      String?
+  content         String
+  rawPayload      String?       // JSON serializado
+  status          String        @default("SENT") // SENT, DELIVERED, READ, FAILED
+  createdAt       DateTime      @default(now())
+}
+
+model AILog {
+  id              String        @id @default(cuid())
+  conversationId  String
+  conversation    Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  modelUsed       String
+  promptTokens    Int           @default(0)
+  completionTokens Int          @default(0)
+  toolCalls       String?       // JSON serializado
+  aiDecision      String?
+  confidenceScore Float?
+  createdAt       DateTime      @default(now())
+}
+
+// ----------------------------------------------------
+// COTIZACIONES Y COSTES RECURRENTES (SNAPSHOT INMUTABLE)
+// ----------------------------------------------------
+model Quote {
+  id              String        @id @default(cuid())
+  quoteNumber     String        @unique // Ej: COT-2026-0001
+  opportunityId   String
+  opportunity     Opportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  contactId       String
+  contact         Contact       @relation(fields: [contactId], references: [id])
+  type            String        @default("STANDARD_PACKAGE") // STANDARD_PACKAGE, CUSTOM_PROPOSAL
+  status          String        @default("DRAFT") // DRAFT, PENDING_APPROVAL, APPROVED, SENT, ACCEPTED, REJECTED, EXPIRED
+  version         Int           @default(1)
+  
+  // Valores Totales
+  setupSubtotal   Float         @default(0.0)
+  setupDiscount   Float         @default(0.0)
+  setupTotal      Float         @default(0.0)
+  
+  recurringTotal  Float         @default(0.0) // Facturado por EDMYSOFT
+  clientDirectTotal Float       @default(0.0) // Pagado directo a terceros (informativo)
+  
+  depositRequired Float         @default(0.0) // Anticipo exigido
+  depositPaid     Float         @default(0.0) // Anticipo abonado
+  balanceDue      Float         @default(0.0) // Saldo pendiente
+  
+  currency        String        @default("COP")
+  validUntil      DateTime
+  notes           String?
+  commercialTerms String?
+  
+  // Aprobación Humana
+  requiresApproval Boolean      @default(false)
+  approvalReason   String?
+  approvedById    String?
+  approvedBy      User?         @relation("QuoteApprover", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  
+  // Snapshot Inmutable (JSON congelado de la propuesta exacta)
+  snapshotData    String
+  pdfUrl          String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  items           QuoteItem[]
+  recurringCosts  QuoteRecurringCost[]
+  payments        PaymentTransaction[]
+}
+
+model QuoteItem {
+  id              String        @id @default(cuid())
+  quoteId         String
+  quote           Quote         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  serviceId       String?
+  service         Service?      @relation(fields: [serviceId], references: [id])
+  planId          String?
+  plan            Plan?         @relation(fields: [planId], references: [id])
+  moduleId        String?
+  module          ServiceModule? @relation(fields: [moduleId], references: [id])
+  
+  conceptName     String
+  description     String?
+  setupPrice      Float         @default(0.0)
+  recurringPrice  Float         @default(0.0)
+  quantity        Int           @default(1)
+  isIncludedInPlan Boolean      @default(false)
+}
+
+model QuoteRecurringCost {
+  id              String        @id @default(cuid())
+  quoteId         String
+  quote           Quote         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  providerName    String        // Ej: "Meta Cloud API", "OpenRouter", "VPS Hetzner"
+  conceptName     String
+  mode            String        @default("INCLUDED") // INCLUDED, BILLED_SEPARATELY, CLIENT_DIRECT
+  internalCost    Float         @default(0.0)
+  clientPrice     Float         @default(0.0)
+  estimatedVolume String?
+  consumptionAlertThreshold Float?
+  notes           String?
+}
+
+// ----------------------------------------------------
+// PAGOS, TRANSACCIONES Y CONCILIACIÓN
+// ----------------------------------------------------
+model PaymentTransaction {
+  id              String        @id @default(cuid())
+  quoteId         String
+  quote           Quote         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  gateway         String        @default("WOMPI") // WOMPI, STRIPE, MANUAL_TRANSFER
+  gatewayReference String?      @unique
+  amount          Float         @default(0.0)
+  currency        String        @default("COP")
+  status          String        @default("PENDING") // PENDING, APPROVED, REJECTED, VOIDED
+  paymentMethod   String?       // NEQUI, BANCOLOMBIA, PSE, CARD
+  receiptUrl      String?
+  verifiedAt      DateTime?
+  createdAt       DateTime      @default(now())
+}
+
+// ----------------------------------------------------
+// TAREAS, AUDITORÍA Y CONFIGURACIÓN DEL SISTEMA
+// ----------------------------------------------------
+model TaskReminder {
+  id              String        @id @default(cuid())
+  opportunityId   String
+  opportunity     Opportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  title           String
+  dueAt           DateTime
+  isCompleted     Boolean       @default(false)
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+}
+
+model ActivityLog {
+  id              String        @id @default(cuid())
+  userId          String?
+  user            User?         @relation(fields: [userId], references: [id])
+  action          String        // QUOTE_CREATED, HUMAN_TAKEOVER, CATALOG_UPDATE
+  entityType      String
+  entityId        String
+  details         String?       // JSON serializado
+  ipAddress       String?
+  createdAt       DateTime      @default(now())
+}
+
+model SystemSetting {
+  id              String        @id @default(cuid())
+  key             String        @unique
+  value           String
+  group           String        @default("GENERAL") // GENERAL, AI, BILLING, INTEGRATIONS
+  description     String?
+  updatedAt       DateTime      @updatedAt
+}
+
+// ----------------------------------------------------
+// CMS VISUAL: CONTENIDO Y VERSIONES DE PÁGINAS WEB
+// ----------------------------------------------------
+model PageContent {
+  id          String            @id @default(cuid())
+  slug        String            @unique // "home", "nosotros", "contacto", etc.
+  title       String
+  seoTitle    String?
+  seoDesc     String?
+  status      String            @default("PUBLISHED") // DRAFT, PUBLISHED
+  publishedAt DateTime?
+  updatedAt   DateTime          @updatedAt
+
+  sections    PageSection[]
+  revisions   ContentRevision[]
+}
+
+model PageSection {
+  id          String      @id @default(cuid())
+  pageId      String
+  page        PageContent @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  sectionKey  String      // "hero", "respaldo_tusoft", "soluciones", "portafolio", "faq", etc.
+  title       String?
+  subtitle    String?
+  content     String      // JSON estructurado
+  order       Int         @default(0)
+  isVisible   Boolean     @default(true)
+}
+
+model ContentRevision {
+  id          String      @id @default(cuid())
+  pageId      String
+  page        PageContent @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  version     Int
+  snapshot    String      // JSON con el estado completo
+  publishedBy String
+  createdAt   DateTime    @default(now())
+}
+
+// ----------------------------------------------------
+// CONEXIÓN DE WHATSAPP (QR NATIVO Y META CLOUD API)
+// ----------------------------------------------------
+model WhatsAppConnection {
+  id                  String    @id @default(cuid())
+  provider            String    @default("QR_DEVICE") // QR_DEVICE, META_CLOUD
+  status              String    @default("DISCONNECTED") // DISCONNECTED, CONNECTING_QR, CONNECTED, ERROR
+  phoneNumber         String?
+  accountName         String?
+  qrCode              String?   // Data URL base64 o string del QR real
+  qrExpiresAt         DateTime?
+  lastConnectedAt     DateTime?
+  lastMessageAt       DateTime?
+  sessionAuthEncrypted String?  // Claves cifradas en servidor (AES-256)
+  errorLogs           String?   // JSON de historial de errores y guías
+  updatedAt           DateTime  @updatedAt
+}
+
+// ----------------------------------------------------
+// PORTAL DEL CLIENTE: PROYECTOS, BÓVEDA Y TICKETS
+// ----------------------------------------------------
+model ClientProject {
+  id            String    @id @default(cuid())
+  name          String
+  ownerEmail    String    // Aislamiento RLS por email del cliente
+  clientName    String
+  progress      Int       @default(15) // 0 - 100
+  stage         String    @default("Análisis") // Análisis, Prototipado, Desarrollo, Pruebas, Despliegue
+  eta           String    // Fecha estimada (YYYY-MM-DD)
+  leadEngineer  String    @default("Edier Mery Gallego (Backed by TuSoft)")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  documents     PrivateDocument[]
+}
+
+model PrivateDocument {
+  id              String         @id @default(cuid())
+  projectId       String?
+  project         ClientProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  ownerEmail      String
+  title           String
+  mimeType        String         @default("application/pdf")
+  sizeKb          Int            @default(1024)
+  classification  String         @default("CONFIDENCIAL") // CONFIDENCIAL, PÚBLICO
+  contentSummary  String?
+  signedToken     String?
+  tokenExpiresAt  DateTime?
+  createdAt       DateTime       @default(now())
+}
+
+model SupportTicket {
+  id          String    @id @default(cuid())
+  ownerEmail  String
+  clientName  String
+  subject     String
+  message     String
+  status      String    @default("En Revisión") // En Revisión, Resuelto
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
