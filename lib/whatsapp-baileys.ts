@@ -265,50 +265,49 @@ async function handleIncomingMessage(
   // Siempre responde de forma prioritaria, sin verse bloqueado por HUMAN_CONTROL ni autoReplyAI.
   // ===================================================================
   if (isOwner) {
-    const targetJid = fromJid.endsWith('@lid') ? fromJid : '573234166354@s.whatsapp.net';
+    const targetJid = fromJid;
     console.log(`[Baileys Copilot] 📥 Mensaje de Edier en "Yo (Tú)": "${incomingText}" (destino: ${targetJid})`);
 
-    try {
-      await sock.sendPresenceUpdate('composing', targetJid);
-    } catch {}
+    sock.sendPresenceUpdate('composing', targetJid).catch(() => {});
 
     const directorRes = await handleDirectorCopilotMessage(incomingText, history, senderPhone);
     const bubbles = splitIntoBubbles(directorRes.reply);
     for (let i = 0; i < bubbles.length; i++) {
       if (i > 0) {
-        try {
-          await sock.sendPresenceUpdate('composing', targetJid);
-        } catch {}
-        await sleep(Math.min(1800, 500 + bubbles[i].length * 12));
+        await sleep(150);
       }
       console.log(`[Baileys Copilot] 📤 Enviando respuesta a Edier burbuja ${i + 1}/${bubbles.length}: "${bubbles[i].slice(0, 60)}..."`);
       try {
         await sendBotMessage(sock, targetJid, { text: bubbles[i] });
       } catch (sendErr: any) {
-        console.warn(`[Baileys Copilot] Error enviando a ${targetJid}: ${sendErr?.message}. Reintentando con s.whatsapp.net`);
-        if (targetJid !== '573234166354@s.whatsapp.net') {
-          await sendBotMessage(sock, '573234166354@s.whatsapp.net', { text: bubbles[i] });
+        console.warn(`[Baileys Copilot] Error enviando a ${targetJid}: ${sendErr?.message}`);
+        const altJid = fromJid.includes('@') ? `${fromJid.split('@')[0]}@s.whatsapp.net` : fromJid;
+        if (altJid !== targetJid) {
+          await sendBotMessage(sock, altJid, { text: bubbles[i] }).catch(() => {});
         }
       }
     }
-    try {
-      await sock.sendPresenceUpdate('paused', targetJid);
-    } catch {}
 
-    await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        senderType: 'AI',
-        senderName: 'Copiloto de Dirección (IA)',
-        content: directorRes.reply,
-        rawPayload: JSON.stringify({ model: directorRes.modelUsed, intent: directorRes.intent }),
-      },
-    });
+    sock.sendPresenceUpdate('paused', targetJid).catch(() => {});
 
-    await prisma.conversation.update({
-      where: { id: conversation.id },
-      data: { lastMessageAt: new Date() },
-    });
+    // Guardar en base de datos en segundo plano sin demorar la respuesta al celular
+    prisma.message
+      .create({
+        data: {
+          conversationId: conversation.id,
+          senderType: 'AI',
+          senderName: 'Copiloto de Dirección (IA)',
+          content: directorRes.reply,
+          rawPayload: JSON.stringify({ model: directorRes.modelUsed, intent: directorRes.intent }),
+        },
+      })
+      .then(() => {
+        return prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { lastMessageAt: new Date() },
+        });
+      })
+      .catch((err) => console.error('[Baileys DB async error]', err));
 
     return; // TERMINA: Jamás ejecuta el flujo de ventas con Edier
   }
@@ -341,44 +340,41 @@ async function handleIncomingMessage(
 
   // Respuesta en burbujas cortas con pausa de "escribiendo..." proporcional al largo
   const bubbles = splitIntoBubbles(toWhatsAppFormat(aiResult.reply));
+  const targetJid = fromJid.includes(':')
+    ? `${fromJid.split('@')[0].split(':')[0]}@s.whatsapp.net`
+    : fromJid;
+
   for (let i = 0; i < bubbles.length; i++) {
     if (i > 0) {
-      try {
-        await sock.sendPresenceUpdate('composing', fromJid);
-      } catch {
-        /* no crítico */
-      }
-      await sleep(Math.min(1800, 500 + bubbles[i].length * 12));
+      await sleep(Math.min(400, 150 + bubbles[i].length * 3));
     }
-    const targetJid = fromJid.includes(':')
-      ? `${fromJid.split('@')[0].split(':')[0]}@s.whatsapp.net`
-      : fromJid;
     await sendBotMessage(sock, targetJid, { text: bubbles[i] });
   }
-  try {
-    await sock.sendPresenceUpdate('paused', fromJid);
-  } catch {
-    /* no crítico */
-  }
 
-  await prisma.message.create({
-    data: {
-      conversationId: conversation.id,
-      senderType: 'AI',
-      senderName: 'EDMYSOFT Atiende (IA)',
-      content: aiResult.reply,
-      rawPayload: JSON.stringify({ model: aiResult.modelUsed, tools: aiResult.toolsUsed || [] }),
-    },
-  });
+  sock.sendPresenceUpdate('paused', fromJid).catch(() => {});
 
-  await prisma.conversation.update({
-    where: { id: conversation.id },
-    data: {
-      lastMessageAt: new Date(),
-      // Si el cliente pidió un asesor, pasa a control humano (el bot deja de responder)
-      ...(aiResult.detectedIntent === 'HUMAN_TAKEOVER' ? { status: 'HUMAN_CONTROL' } : {}),
-    },
-  });
+  // Guardar en base de datos en segundo plano sin retrasar la respuesta al cliente
+  prisma.message
+    .create({
+      data: {
+        conversationId: conversation.id,
+        senderType: 'AI',
+        senderName: 'EDMYSOFT Atiende (IA)',
+        content: aiResult.reply,
+        rawPayload: JSON.stringify({ model: aiResult.modelUsed, tools: aiResult.toolsUsed || [] }),
+      },
+    })
+    .then(() => {
+      return prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          lastMessageAt: new Date(),
+          // Si el cliente pidió un asesor, pasa a control humano (el bot deja de responder)
+          ...(aiResult.detectedIntent === 'HUMAN_TAKEOVER' ? { status: 'HUMAN_CONTROL' } : {}),
+        },
+      });
+    })
+    .catch((err) => console.error('[Baileys DB async error]', err));
 }
 
 /**

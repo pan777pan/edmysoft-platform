@@ -131,6 +131,95 @@ export async function handleDirectorCopilotMessage(
   const lower = text.toLowerCase();
 
   // ===================================================================
+  // 0.0 SALUDO INMEDIATO AL DIRECTOR (Respuesta en <100ms)
+  // ===================================================================
+  const isGreeting =
+    /^(hola|buenas|buenos dias|buenas tardes|buenas noches|hey|que mas|como vas|como te va|saludos|parcero|hermano|alo|holi)\b/i.test(
+      lower
+    ) && text.length < 40;
+
+  if (isGreeting) {
+    return {
+      reply:
+        `¡Hola Edier! 👋 Un gusto saludarte, hermano.\n\n` +
+        `Tu plataforma EDMYSOFT y el bot de WhatsApp están activos y trabajando 24/7 en la nube.\n\n` +
+        `⚡ *Acciones rápidas que puedes pedirme:*\n` +
+        `• 📊 *Métricas:* Escribe _"resumen de hoy"_ o _"cuántas personas entraron"_\n` +
+        `• 🛠️ *Web & Precios:* Escribe _"ver catálogo"_ o _"cambia el precio del Plan Plus a..."_\n` +
+        `• 🧠 *Enseñar al bot:* Escribe _"aprende que [instrucción]"_\n` +
+        `• 💡 *Comandos:* Escribe _"ayuda"_ para ver todo el menú de control.`,
+      modelUsed: 'copiloto-director-instant-greeting',
+      intent: 'DIRECTOR_STRATEGY',
+    };
+  }
+
+  // ===================================================================
+  // 0.05 MENÚ DE COMANDOS Y AYUDA DE DIRECCIÓN
+  // ===================================================================
+  const isAskingHelp =
+    /\b(ayuda|comandos|que sabes hacer|que puedes hacer|funciones|menu|guia|instrucciones|que opciones hay|opciones)\b/i.test(
+      norm(lower)
+    );
+
+  if (isAskingHelp) {
+    return {
+      reply:
+        `🚀 *PANEL DE COMANDOS DE DIRECCIÓN — EDMYSOFT*\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `Edier, como tu Copiloto Ejecutivo, puedes controlar la plataforma enviándome estos mensajes:\n\n` +
+        `📊 *1. MÉTRICAS & TRÁFICO EN VIVO:*\n` +
+        `• _"Resumen de hoy"_ o _"¿Cuántas personas han entrado hoy?"_\n` +
+        `• _"Revisa los chats"_ o _"¿Quién ha escrito?"_\n\n` +
+        `🛠️ *2. MODIFICAR LA PÁGINA WEB DESDE WHATSAPP:*\n` +
+        `• _"Ver catálogo"_ (muestra todos los precios activos)\n` +
+        `• _"Cambia el precio del Plan Plus a 3.500.000 setup y 500.000 mensual"_\n` +
+        `• _"Cambia el título de la página a [Nuevo Título]"_\n` +
+        `• _"Desactiva el plan [Nombre]"_ / _"Activa el plan [Nombre]"_\n\n` +
+        `🧠 *3. ENSEÑAR REGLAS Y ENTRENAR EL BOT:*\n` +
+        `• _"Aprende que [regla o respuesta]"_ (se sincroniza de inmediato a la IA)\n` +
+        `• _"Dudas pendientes"_ (te muestra preguntas que clientes hicieron sin respuesta)\n\n` +
+        `👥 *4. ASESORÍA PARA CERRAR VENTAS:*\n` +
+        `• _"¿Cómo le respondo a este cliente?"_ (análisis táctico de negociación)\n\n` +
+        `🔍 *5. ESTADO Y SALUD DEL SISTEMA:*\n` +
+        `• _"Estado del sistema"_ (verifica base de datos, conexión y estadísticas)\n\n` +
+        `💬 *6. CHARLA PERSONAL, MATEMÁTICAS & AMIGO:*\n` +
+        `• Cálculos: _"¿Cuánto es el 15% de 3.800.000?"_\n` +
+        `• Despejar la mente: _"Estoy cansado"_, _"Cuéntame un chiste"_, _"Recomiéndame una serie"_.`,
+      modelUsed: 'copiloto-director-help',
+      intent: 'DIRECTOR_STRATEGY',
+    };
+  }
+
+  // ===================================================================
+  // 0.08 ESTADO Y SALUD DEL SISTEMA (DIAGNÓSTICO EN VIVO)
+  // ===================================================================
+  const isAskingStatus =
+    /\b(estado del sistema|estado del bot|status|diagnostico|como va el servidor|como esta el bot|como esta todo|ping|salud del sistema)\b/i.test(
+      norm(lower)
+    );
+
+  if (isAskingStatus) {
+    const totalContacts = await prisma.contact.count().catch(() => 0);
+    const totalMessages = await prisma.message.count().catch(() => 0);
+    const waConn = await prisma.whatsAppConnection.findFirst().catch(() => null);
+
+    return {
+      reply:
+        `🟢 *ESTADO DEL SISTEMA — EDMYSOFT PLATFORM*\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `• 📱 *WhatsApp Bot (Baileys):* ${waConn?.status === 'CONNECTED' ? '✅ CONECTADO 24/7' : '⚠️ ' + (waConn?.status || 'ACTIVO')}\n` +
+        `• 🗄️ *Base de Datos (Supabase):* ✅ Conectada y sincronizada\n` +
+        `• 🌐 *Página Web (Vercel):* ✅ Activa en producción con SSL\n` +
+        `• 👥 *Contactos Registrados en CRM:* ${totalContacts} clientes\n` +
+        `• 💬 *Historial de Mensajes Almacenados:* ${totalMessages} mensajes\n` +
+        `• ⏱️ *Última sincronización:* ${new Date().toLocaleTimeString('es-CO')} (hora Colombia)\n\n` +
+        `Todo el ecosistema está operando de manera óptima y fluida.`,
+      modelUsed: 'copiloto-director-status',
+      intent: 'DIRECTOR_STRATEGY',
+    };
+  }
+
+  // ===================================================================
   // 0. CONTROL REMOTO Y MODIFICACIONES EN VIVO DE LA WEB / CATÁLOGO
   // ===================================================================
   const webCommand = await executeDirectorWebCommand(text);

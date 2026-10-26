@@ -1452,6 +1452,77 @@ async function runLocalAgent(userMessage: string, history: ChatMessage[], ctx: A
   }
 
   // ===================================================================
+  // 3.8 SERVICIOS Y SOLUCIONES QUE OFRECE EDMYSOFT
+  // ===================================================================
+  if (
+    /\b(que servicios|cuales son sus servicios|cuales servicios|que hacen|a que se dedican|que ofrecen|que soluciones tienen|servicios disponibles|que productos tienen|en que me pueden ayudar|informacion de servicios|catalogo de servicios)\b/i.test(
+      t
+    ) ||
+    (/\b(servicios|soluciones)\b/i.test(t) && /\b(tienen|ofrecen|manejan|cuales)\b/i.test(t))
+  ) {
+    return done(
+      `En *EDMYSOFT* transformamos operaciones comerciales y multiplicamos ventas mediante 3 pilares tecnológicos de alto impacto:\n\n` +
+      `1️⃣ *Agentes de IA para WhatsApp & Redes Sociales*: Asistentes inteligentes con memoria que atienden 24/7, responden dudas de tu catálogo, cotizan en tiempo real y agendan citas en tu calendario.\n\n` +
+      `2️⃣ *Automatización Empresarial con n8n*: Conectamos tu WhatsApp y web con Google Sheets, tu CRM, facturación electrónica DIAN y ERPs para eliminar tareas manuales.\n\n` +
+      `3️⃣ *Desarrollo de Software y Páginas Web (Next.js)*: Plataformas web ultrarrápidas (<1s de carga), tiendas virtuales con pasarela Wompi y paneles administrativos a la medida.\n\n` +
+      `¿Cuál de estas tres áreas te gustaría implementar o mejorar en tu empresa?`,
+      'GENERAL'
+    );
+  }
+
+  // ===================================================================
+  // 3.9 DEMO EN VIVO / CÓMO PROBAR LA PLATAFORMA
+  // ===================================================================
+  if (/\b(demo|demostracion|puedo probar|como funciona|como trabaja|verlo funcionando|ensayo|prueba|probar el bot)\b/i.test(t)) {
+    return done(
+      `¡Claro que sí! Puedes comprobar la efectividad de nuestras soluciones de dos formas:\n\n` +
+      `1️⃣ *En este mismo chat*: Estás interactuando en vivo con nuestro agente comercial de IA. Pregúntame sobre precios, servicios, o pide agendar una cita para ver cómo responde al instante.\n\n` +
+      `2️⃣ *Videollamada Diagnóstica de 15 min (Google Meet)*: Nuestro Director Técnico, Edier Mery Gallego, te muestra en pantalla cómo se adapta el bot con el catálogo y las reglas exactas de tu negocio.\n\n` +
+      `¿Te gustaría que agendemos esa sesión diagnóstica gratuita para esta semana?`,
+      'SCHEDULE'
+    );
+  }
+
+  // ===================================================================
+  // 3.95 UBICACIÓN, COBERTURA Y SEDE
+  // ===================================================================
+  if (/\b(donde estan|de donde son|ubicacion|ciudad|pais|oficina|donde quedan|tienen sede|direccion)\b/i.test(t)) {
+    return done(
+      `*EDMYSOFT* tiene su sede principal en *Colombia* 🇨🇴, bajo la dirección técnica de *Edier Mery Gallego*.\n\n` +
+      `Brindamos atención, desarrollo e implementación 100% remota con soporte directo en toda Colombia (Bogotá, Medellín, Cali, Barranquilla, Bucaramanga, Pereira, etc.) y Latinoamérica.\n\n` +
+      `¿En qué ciudad o país se encuentra ubicado tu negocio?`,
+      'GENERAL'
+    );
+  }
+
+  // ===================================================================
+  // 3.96 TIEMPOS DE ENTREGA Y PLAZOS
+  // ===================================================================
+  if (/\b(cuanto tiempo|cuanto demora|cuanto tardan|tiempo de entrega|plazo de entrega|en cuanto tiempo|cuantos dias)\b/i.test(t)) {
+    return done(
+      `Nuestros tiempos de entrega son ágiles y garantizados por contrato:\n\n` +
+      `⚡ *Agente de IA para WhatsApp (Plan Estándar)*: *3 a 5 días hábiles* con tu base de datos y FAQs entrenadas.\n` +
+      `⭐ *Plan Plus (con cotizador, n8n y Google Calendar)*: *5 a 8 días hábiles*.\n` +
+      `🌐 *Plataformas Web y Software a Medida (Next.js)*: *2 a 3 semanas* según los módulos requeridos.\n\n` +
+      `Todo incluye capacitación personalizada y acompañamiento técnico directo. ¿Para qué fecha te gustaría tener tu solución operando?`,
+      'GENERAL'
+    );
+  }
+
+  // ===================================================================
+  // 3.97 MÉTODOS DE PAGO Y CONTRATACIÓN
+  // ===================================================================
+  if (/\b(como se paga|formas de pago|metodos de pago|medios de pago|como se contrata|anticipo|cuotas|wompi|nequi|bancolombia|pse|tarjeta)\b/i.test(t)) {
+    return done(
+      `Trabajamos con un esquema de contratación transparente y seguro:\n\n` +
+      `💳 *Esquema de Pago:* *50% de anticipo* para iniciar la arquitectura y desarrollo, y el *50% final contra entrega a satisfacción* tras las pruebas en vivo.\n\n` +
+      `🔒 *Medios de Pago Soportados:* Pasarela segura *Wompi* (Bancolombia, Nequi, PSE de cualquier banco y Tarjetas de Crédito/Débito) o transferencia bancaria directa.\n\n` +
+      `Facturación formal y contrato de prestación de servicios con cláusula de confidencialidad (Habeas Data). ¿Deseas que preparemos tu propuesta formal?`,
+      'GENERAL'
+    );
+  }
+
+  // ===================================================================
   // 4. PREGUNTAS TÉCNICAS FRECUENTES (FAQ & ARQUITECTURA)
   // ===================================================================
   // 4.1 WhatsApp QR vs API Oficial de Meta
@@ -1603,7 +1674,7 @@ async function runLocalAgent(userMessage: string, history: ChatMessage[], ctx: A
   // ===================================================================
   // 8. SALUDOS INICIALES (CON MEMORIA ACTIVA DE CLIENTES RECURRENTES)
   // ===================================================================
-  if (/^(hola|buenas|buenos dias|buenas tardes|buenas noches|hey|saludos|que tal)\b/.test(t) && t.length < 35) {
+  if (/^(hola|buenas|buenos dias|buenas tardes|buenas noches|hey|saludos|que tal|holi)\b/.test(t) && !/(precio|cuanto|cotiz|plan|agend|reunion|cita|servicio|comprar|contratar)/.test(t)) {
     const memory = ctx.customerMemory;
     const clientName = memory?.fullName || (hasRealName(ctx.contactName) ? ctx.contactName! : '');
     const firstName = clientName ? clientName.split(' ')[0] : '';
