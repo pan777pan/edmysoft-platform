@@ -107,8 +107,7 @@ export function isOwnerSender(phone: string): boolean {
     clean === '573234166354' ||
     clean.endsWith('3234166354') ||
     clean === '110428222963765' ||
-    phone.includes('110428222963765') ||
-    phone.endsWith('@lid')
+    phone.includes('110428222963765')
   );
 }
 

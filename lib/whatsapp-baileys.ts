@@ -196,19 +196,26 @@ async function handleIncomingMessage(
   pushName: string | null,
   state: BaileysState
 ): Promise<void> {
-  const isOwner =
-    isOwnerSender(fromJid) ||
-    fromJid.endsWith('@lid') ||
-    fromJid.includes('110428222963765') ||
-    fromJid === 'me' ||
-    fromJid.includes('3234166354') ||
-    isOwnerSender(fromJid.split('@')[0].split(':')[0]);
+  const myLid = (sock?.user?.lid || '110428222963765').split(':')[0].replace(/\D/g, '');
+  const myPhone = (sock?.user?.id || '573234166354').split(':')[0].replace(/\D/g, '');
+  const rawDigits = fromJid.split('@')[0].split(':')[0].replace(/\D/g, '');
 
-  let senderPhone = fromJid.split('@')[0].split(':')[0].replace(/\D/g, '');
-  if (isOwner || !senderPhone) {
+  // El chat de Dirección es ÚNICA Y EXCLUSIVAMENTE el chat personal de Edier (+57 323 416 6354 / Yo Tú)
+  // Ningún cliente externo puede ser catalogado como Director bajo ninguna circunstancia
+  const isOwner =
+    rawDigits === '573234166354' ||
+    rawDigits.endsWith('3234166354') ||
+    fromJid.includes('3234166354') ||
+    (Boolean(myPhone) && rawDigits === myPhone) ||
+    (Boolean(myLid) && (fromJid.startsWith(`${myLid}@`) || fromJid.startsWith(`${myLid}:`))) ||
+    fromJid.includes('110428222963765') ||
+    fromJid === 'me';
+
+  let senderPhone = rawDigits;
+  if (isOwner && (!senderPhone || senderPhone === myLid || fromJid === 'me')) {
     senderPhone = '573234166354';
   }
-  const senderName = pushName || (isOwner ? 'Edier Mery Gallego (Director)' : senderPhone);
+  const senderName = pushName || (isOwner ? 'Edier Mery Gallego (Director)' : (senderPhone || 'Cliente'));
 
   // 1. Contacto en el CRM
   let contact = await prisma.contact.findFirst({ where: { phone: senderPhone } });
@@ -687,22 +694,21 @@ export async function startBaileysSocket(opts: { force?: boolean; note?: string 
 
           if (!incomingText) continue;
 
-          const myPhone = (sock.user?.id || '573234166354').replace(/\D/g, '');
+          const myPhone = (sock.user?.id || '573234166354').split(':')[0].replace(/\D/g, '');
           const myLid = (sock.user?.lid || '110428222963765').split(':')[0].replace(/\D/g, '');
-          const remoteDigits = (fromJid || '').replace(/\D/g, '');
-          const participantDigits = (msg.key.participant || '').replace(/\D/g, '');
+          const remoteDigits = (fromJid || '').split(':')[0].replace(/\D/g, '');
+          const participantDigits = (msg.key.participant || '').split(':')[0].replace(/\D/g, '');
 
-          // Detección exhaustiva del chat consigo mismo ("Yo / Tú" - Edier Mery Gallego)
-          // En WhatsApp Multi-Device el chat propio se enruta mediante identificador @lid (ej: 110428222963765@lid)
+          // Detección estricta y segura del chat consigo mismo ("Yo / Tú" - Edier Mery Gallego)
+          // ÚNICA Y EXCLUSIVAMENTE su número 3234166354 o su LID exacto (jamás cualquier @lid genérico)
           const isSelfChat =
-            fromJid.endsWith('@lid') ||
-            fromJid.includes('110428222963765') ||
-            (Boolean(myLid) && remoteDigits === myLid) ||
-            remoteDigits === myPhone ||
+            remoteDigits === '573234166354' ||
             remoteDigits.endsWith('3234166354') ||
-            participantDigits === myPhone ||
-            participantDigits.endsWith('3234166354') ||
             fromJid.includes('3234166354') ||
+            (Boolean(myPhone) && remoteDigits === myPhone) ||
+            participantDigits.endsWith('3234166354') ||
+            (Boolean(myLid) && (fromJid.startsWith(`${myLid}@`) || fromJid.startsWith(`${myLid}:`))) ||
+            fromJid.includes('110428222963765') ||
             fromJid === 'me';
 
           console.log(`[Baileys Event] tipo: ${m.type}, fromMe: ${msg.key.fromMe}, isSelf: ${isSelfChat}, fromJid: ${fromJid}, texto: "${incomingText.slice(0, 40)}"`);
